@@ -19,7 +19,6 @@ const KEY_ID = process.env.RAZORPAY_KEY_ID;
 const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 const AGENT_TOKEN = process.env.PRINT_AGENT_TOKEN;
 
-// Test mode only
 const TEST_MODE = Boolean(
   KEY_ID &&
   KEY_ID.startsWith("rzp_test_") &&
@@ -33,54 +32,54 @@ const razorpay = TEST_MODE
     })
   : null;
 
-// Temporary memory storage for testing
+// Temporary Test Mode job storage
 const jobs = new Map();
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "20kb" }));
 
-// Serve only public assets, not private files
+// Website files
+app.use(express.static(
+  path.join(__dirname, "public"),
+  { dotfiles: "deny" }
+));
 
-const sendPublicAsset = (filename, contentType) => {
-  return (_req, res) => {
-    res.type(contentType);
-    res.sendFile(path.join(__dirname, filename));
-  };
-};
-
-app.get("/style.css",
-  sendPublicAsset("style.css", "text/css"));
-
-app.get("/app.js",
-  sendPublicAsset("app.js", "application/javascript"));
-
-app.get("/logo.png",
-  sendPublicAsset("logo.png", "image/png"));
-
-
-// Your index.html is in the root folder
-app.get("/", (req, res) => {
+// Serve root-level website assets safely
+app.get("/", (_req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// Calculate total amount in paise
+app.get("/style.css", (_req, res) => {
+  res.sendFile(path.join(__dirname, "style.css"));
+});
+
+app.get("/app.js", (_req, res) => {
+  res.sendFile(path.join(__dirname, "app.js"));
+});
+
+app.get("/logo.png", (_req, res) => {
+  res.sendFile(path.join(__dirname, "logo.png"));
+});
+
+// Progressive slab pricing in paise
 function calculateAmount(pages) {
   if (
     !Number.isInteger(pages) ||
     pages < 1 ||
     pages > 500
   ) {
-    throw new Error("Invalid page count");
+    throw new Error("Invalid total page count");
   }
 
-  if (pages === 1) return 500;
-  if (pages <= 5) return pages * 300;
-  if (pages <= 10) return pages * 200;
-
-  return pages * 150;
+  return (
+    500 +
+    Math.min(Math.max(pages - 1, 0), 4) * 300 +
+    Math.min(Math.max(pages - 5, 0), 5) * 200 +
+    Math.max(pages - 10, 0) * 150
+  );
 }
 
-// Safe comparison
+// Secure string comparison
 function safeEqual(a, b) {
   if (
     typeof a !== "string" ||
@@ -95,7 +94,7 @@ function safeEqual(a, b) {
 }
 
 // Health check
-app.get("/api/health", (req, res) => {
+app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     service: "ETAWAH CAFE Self Print Kiosk",
@@ -105,13 +104,13 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// PDF upload configuration
+// PDF upload
 const upload = multer({
   dest: UPLOAD_DIR,
   limits: {
     fileSize: 15 * 1024 * 1024
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     const valid =
       file.mimetype === "application/pdf" &&
       path.extname(file.originalname)
@@ -124,7 +123,6 @@ const upload = multer({
   }
 });
 
-// Upload PDF and calculate amount
 app.post(
   "/api/upload",
   upload.single("pdf"),
@@ -143,9 +141,12 @@ app.post(
       });
 
       const pages = pdf.getPageCount();
-      const amount = calculateAmount(pages);
-      const fileId = crypto.randomUUID();
 
+      if (pages < 1 || pages > 500) {
+        throw new Error("PDF must have 1 to 500 pages");
+      }
+
+      const fileId = crypto.randomUUID();
       const finalPath = path.join(
         UPLOAD_DIR,
         fileId + ".pdf"
@@ -157,7 +158,10 @@ app.post(
         fileId,
         filePath: finalPath,
         pages,
-        amount,
+        amount: calculateAmount(pages),
+        copies: null,
+        printType: null,
+        totalPages: null,
         orderId: null,
         paymentId: null,
         status: "uploaded",
@@ -169,7 +173,7 @@ app.post(
       res.json({
         fileId,
         pages,
-        amount: amount / 100,
+        amount: calculateAmount(pages) / 100,
         currency: "INR",
         name: path.basename(req.file.originalname)
       });
@@ -186,178 +190,238 @@ app.post(
   }
 );
 
-// Create Razorpay payment order
-app.post("/api/payment/create-order", async (req, res) => {
-  if (!razorpay) {
-    return res.status(503).json({
-      error: "Razorpay Test Mode not configured"
-    });
-  }
-
-  const fileId = req.body?.fileId;
-  const job = jobs.get(fileId);
-
-  if (!job) {
-    return res.status(404).json({
-      error: "Please upload PDF first"
-    });
-  }
-
-  if (job.status === "pending_payment") {
-    return res.json({
-      key: KEY_ID,
-      orderId: job.orderId,
-      amount: job.amount,
-      currency: "INR",
-      pages: job.pages,
-      business: "ETAWAH CAFE"
-    });
-  }
-
-  if (job.status !== "uploaded") {
-    return res.status(409).json({
-      error: "Payment order cannot be created"
-    });
-  }
-
-  job.status = "creating_order";
-
-  try {
-    const order = await razorpay.orders.create({
-      amount: job.amount,
-      currency: "INR",
-      receipt: fileId.replace(/-/g, "").slice(0, 32),
-      notes: {
-        fileId,
-        pages: String(job.pages)
-      }
-    });
-
-    job.orderId = order.id;
-    job.status = "pending_payment";
-
-    res.json({
-      key: KEY_ID,
-      orderId: order.id,
-      amount: job.amount,
-      currency: "INR",
-      pages: job.pages,
-      business: "ETAWAH CAFE"
-    });
-
-  } catch (err) {
-    job.status = "uploaded";
-
-    console.error("Razorpay order error:", err.message);
-
-    res.status(502).json({
-      error: "Unable to create payment order"
-    });
-  }
-});
-
-// Verify Razorpay payment
-app.post("/api/payment/verify", async (req, res) => {
-  if (!razorpay) {
-    return res.status(503).json({
-      error: "Payment gateway unavailable"
-    });
-  }
-
-  const {
-    fileId,
-    razorpay_order_id,
-    razorpay_payment_id,
-    razorpay_signature
-  } = req.body || {};
-
-  const job = jobs.get(fileId);
-
-  if (!job || !job.orderId) {
-    return res.status(404).json({
-      error: "Payment job not found"
-    });
-  }
-
-  if (
-    job.status === "paid" &&
-    job.paymentId === razorpay_payment_id
-  ) {
-    return res.json({
-      verified: true,
-      printAllowed: !job.claimed,
-      fileId
-    });
-  }
-
-  if (job.status !== "pending_payment") {
-    return res.status(409).json({
-      error: "Payment is not pending"
-    });
-  }
-
-  if (
-    typeof razorpay_order_id !== "string" ||
-    typeof razorpay_payment_id !== "string" ||
-    typeof razorpay_signature !== "string" ||
-    razorpay_order_id !== job.orderId
-  ) {
-    return res.status(400).json({
-      error: "Invalid payment details"
-    });
-  }
-
-  // Verify signature
-  const expectedSignature = crypto
-    .createHmac("sha256", KEY_SECRET)
-    .update(
-      job.orderId + "|" + razorpay_payment_id
-    )
-    .digest("hex");
-
-  if (!safeEqual(expectedSignature, razorpay_signature)) {
-    return res.status(403).json({
-      error: "Invalid payment signature"
-    });
-  }
-
-  try {
-    // Independently confirm payment with Razorpay
-    const payment = await razorpay.payments.fetch(
-      razorpay_payment_id
-    );
-
-    if (
-      payment.order_id !== job.orderId ||
-      payment.amount !== job.amount ||
-      payment.currency !== "INR" ||
-      payment.status !== "captured"
-    ) {
-      return res.status(409).json({
-        error: "Payment not captured or amount mismatch"
+// Create Razorpay Order
+app.post(
+  "/api/payment/create-order",
+  async (req, res) => {
+    if (!razorpay) {
+      return res.status(503).json({
+        error: "Razorpay Test Mode not configured"
       });
     }
 
-    job.paymentId = payment.id;
-    job.status = "paid";
+    const fileId = req.body?.fileId;
+    const copies = Number(req.body?.copies);
+    const printType = req.body?.printType;
 
-    res.json({
-      verified: true,
-      printAllowed: true,
-      fileId,
-      pages: job.pages,
-      amount: job.amount / 100,
-      message: "Payment verified successfully"
-    });
+    if (
+      !Number.isInteger(copies) ||
+      copies < 1 ||
+      copies > 20 ||
+      !["bw", "color"].includes(printType)
+    ) {
+      return res.status(400).json({
+        error: "Invalid print settings"
+      });
+    }
 
-  } catch (err) {
-    console.error("Payment verification error:", err.message);
+    const job = jobs.get(fileId);
 
-    res.status(502).json({
-      error: "Unable to confirm payment. Retry verification."
-    });
+    if (!job) {
+      return res.status(404).json({
+        error: "Upload PDF first"
+      });
+    }
+
+    const totalPages = job.pages * copies;
+
+    if (totalPages < 1 || totalPages > 500) {
+      return res.status(400).json({
+        error: "Maximum 500 total print pages allowed"
+      });
+    }
+
+    const amount = calculateAmount(totalPages);
+
+    if (job.status === "pending_payment") {
+      if (
+        job.copies !== copies ||
+        job.printType !== printType ||
+        job.amount !== amount
+      ) {
+        return res.status(409).json({
+          error:
+            "Print settings changed. Upload PDF again."
+        });
+      }
+
+      return res.json({
+        key: KEY_ID,
+        orderId: job.orderId,
+        amount: job.amount,
+        currency: "INR",
+        pages: job.pages,
+        totalPages: job.totalPages,
+        business: "ETAWAH CAFE"
+      });
+    }
+
+    if (job.status !== "uploaded") {
+      return res.status(409).json({
+        error: "Payment order cannot be created"
+      });
+    }
+
+    job.amount = amount;
+    job.copies = copies;
+    job.printType = printType;
+    job.totalPages = totalPages;
+    job.status = "creating_order";
+
+    try {
+      const order = await razorpay.orders.create({
+        amount: job.amount,
+        currency: "INR",
+        receipt: fileId.replace(/-/g, "").slice(0, 32),
+        notes: {
+          fileId,
+          pages: String(job.pages),
+          copies: String(copies),
+          printType
+        }
+      });
+
+      job.orderId = order.id;
+      job.status = "pending_payment";
+
+      res.json({
+        key: KEY_ID,
+        orderId: order.id,
+        amount: job.amount,
+        currency: "INR",
+        pages: job.pages,
+        totalPages: job.totalPages,
+        business: "ETAWAH CAFE"
+      });
+
+    } catch (err) {
+      job.status = "uploaded";
+
+      console.error(
+        "Order creation error:",
+        err.message
+      );
+
+      res.status(502).json({
+        error: "Unable to create payment order"
+      });
+    }
   }
-});
+);
+
+// Verify Razorpay Payment
+app.post(
+  "/api/payment/verify",
+  async (req, res) => {
+    if (!razorpay) {
+      return res.status(503).json({
+        error: "Payment gateway unavailable"
+      });
+    }
+
+    const {
+      fileId,
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    } = req.body || {};
+
+    const job = jobs.get(fileId);
+
+    if (!job || !job.orderId) {
+      return res.status(404).json({
+        error: "Payment job not found"
+      });
+    }
+
+    if (
+      job.status === "paid" &&
+      job.paymentId === razorpay_payment_id
+    ) {
+      return res.json({
+        verified: true,
+        printAllowed: !job.claimed,
+        fileId
+      });
+    }
+
+    if (job.status !== "pending_payment") {
+      return res.status(409).json({
+        error: "Payment not pending"
+      });
+    }
+
+    if (
+      typeof razorpay_order_id !== "string" ||
+      typeof razorpay_payment_id !== "string" ||
+      typeof razorpay_signature !== "string" ||
+      razorpay_order_id !== job.orderId
+    ) {
+      return res.status(400).json({
+        error: "Invalid payment details"
+      });
+    }
+
+    const expectedSignature = crypto
+      .createHmac("sha256", KEY_SECRET)
+      .update(
+        job.orderId + "|" + razorpay_payment_id
+      )
+      .digest("hex");
+
+    if (!safeEqual(
+      expectedSignature,
+      razorpay_signature
+    )) {
+      return res.status(403).json({
+        error: "Invalid payment signature"
+      });
+    }
+
+    try {
+      const payment = await razorpay.payments.fetch(
+        razorpay_payment_id
+      );
+
+      if (
+        payment.order_id !== job.orderId ||
+        payment.amount !== job.amount ||
+        payment.currency !== "INR" ||
+        payment.status !== "captured"
+      ) {
+        return res.status(409).json({
+          error:
+            "Payment not captured or amount mismatch"
+        });
+      }
+
+      job.paymentId = payment.id;
+      job.status = "paid";
+
+      res.json({
+        verified: true,
+        printAllowed: true,
+        fileId,
+        pages: job.pages,
+        copies: job.copies,
+        totalPages: job.totalPages,
+        amount: job.amount / 100,
+        message: "Payment verified successfully"
+      });
+
+    } catch (err) {
+      console.error(
+        "Payment verification error:",
+        err.message
+      );
+
+      res.status(502).json({
+        error:
+          "Unable to confirm payment. Retry verification."
+      });
+    }
+  }
+);
 
 // Job status
 app.get("/api/job/:fileId/status", (req, res) => {
@@ -406,9 +470,13 @@ app.post(
       });
     }
 
-    if (job.status !== "paid" || job.claimed) {
+    if (
+      job.status !== "paid" ||
+      job.claimed
+    ) {
       return res.status(409).json({
-        error: "Print not authorized or already claimed"
+        error:
+          "Print not authorized or already claimed"
       });
     }
 
@@ -418,13 +486,16 @@ app.post(
       authorized: true,
       fileId: job.fileId,
       pages: job.pages,
+      copies: job.copies,
+      printType: job.printType,
+      totalPages: job.totalPages,
       downloadPath:
         "/api/print/file/" + job.fileId
     });
   }
 );
 
-// Protected PDF download for print agent
+// Protected PDF download
 app.get(
   "/api/print/file/:fileId",
   checkAgent,
@@ -457,7 +528,7 @@ app.get(
 );
 
 // Error handler
-app.use((err, req, res, next) => {
+app.use((err, _req, res, _next) => {
   console.error("Request error:", err.message);
 
   res.status(400).json({
@@ -468,6 +539,7 @@ app.use((err, req, res, next) => {
 // Start server
 app.listen(PORT, () => {
   console.log(
-    "ETAWAH CAFE Self Print Kiosk running on port " + PORT
+    "ETAWAH CAFE Self Print Kiosk running on port " +
+    PORT
   );
 });
