@@ -12,7 +12,7 @@ const upload = multer({dest:UPLOAD_DIR,limits:{fileSize:15*1024*1024},fileFilter
   const ok=file.mimetype==="application/pdf"&&path.extname(file.originalname).toLowerCase()===".pdf";
   cb(ok?null:new Error("Only PDF files are allowed."),ok);
 }});
-app.use(express.static(path.join(__dirname,"public")));
+app.use(express.static(__dirname));
 app.get("/api/health",(_req,res)=>res.json({ok:true,service:"ETAWAH CAFE Self Print Kiosk",paymentsEnabled:false}));
 app.post("/api/upload",upload.single("pdf"),async(req,res)=>{
   if(!req.file)return res.status(400).json({error:"Please choose a PDF file."});
