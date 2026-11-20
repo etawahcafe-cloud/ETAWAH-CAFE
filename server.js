@@ -40,10 +40,23 @@ app.disable("x-powered-by");
 app.use(express.json({ limit: "20kb" }));
 
 // Serve only public assets, not private files
-app.use(express.static(
-  path.join(__dirname, "public"),
-  { dotfiles: "deny" }
-));
+
+const sendPublicAsset = (filename, contentType) => {
+  return (_req, res) => {
+    res.type(contentType);
+    res.sendFile(path.join(__dirname, filename));
+  };
+};
+
+app.get("/style.css",
+  sendPublicAsset("style.css", "text/css"));
+
+app.get("/app.js",
+  sendPublicAsset("app.js", "application/javascript"));
+
+app.get("/logo.png",
+  sendPublicAsset("logo.png", "image/png"));
+
 
 // Your index.html is in the root folder
 app.get("/", (req, res) => {
