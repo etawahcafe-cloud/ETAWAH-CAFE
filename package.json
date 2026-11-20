@@ -1,0 +1,10 @@
+{
+  "name": "etawah-cafe-self-print-kiosk",
+  "version": "2.0.0",
+  "private": true,
+  "description": "ETAWAH CAFE professional self-print website — payment gateway to be integrated in phase two",
+  "main": "server.js",
+  "scripts": {"start": "node server.js"},
+  "engines": {"node": ">=18"},
+  "dependencies": {"express": "^4.21.2", "multer": "^1.4.5-lts.2", "pdf-lib": "^1.17.1"}
+}
