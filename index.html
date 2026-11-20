@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b2852">
+  <meta name="description" content="ETAWAH CAFE Self Print Kiosk — upload your PDF, check pages and estimate your printing price in Etawah.">
+  <title>ETAWAH CAFE | Self Print Kiosk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="topline"></div>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="ETAWAH CAFE home"><img src="/logo.png" alt="ETAWAH CAFE logo"><span>ETAWAH <b>CAFE</b><small>SELF PRINT KIOSK</small></span></a>
+    <a class="call-link" href="tel:9997881913"><span class="call-icon">☎</span><span><small>Need help?</small><strong>99978 81913</strong></span></a>
+  </header>
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow"><i></i> SMART SELF PRINT SERVICE · ETAWAH</span>
+        <h1>Your documents.<br><em>Printed with ease.</em></h1>
+        <p>Upload your PDF, choose your print preferences and check your estimated price — all in one simple place.</p>
+        <div class="hero-points"><span>✓ Easy PDF upload</span><span>✓ Clear page-wise rates</span><span>✓ Quick service</span></div>
+      </div>
+      <div class="hero-art"><div class="art-glow"></div><img src="/logo.png" alt="ETAWAH CAFE Self Print Kiosk emblem"><div class="art-tag"><span>PRINT SMART</span><b>Save time. Print easy.</b></div></div>
+    </section>
+
+    <section class="workspace" aria-labelledby="start-title">
+      <div class="section-heading"><div><span class="eyebrow">GET STARTED</span><h2 id="start-title">Prepare your print</h2></div><span class="step-pill">STEP 01 <b>·</b> PDF DETAILS</span></div>
+      <div class="workspace-grid">
+        <div class="upload-card">
+          <div class="card-title"><span class="title-icon">PDF</span><div><h3>Upload your document</h3><p>Choose one PDF file from your device</p></div></div>
+          <label class="drop-zone" for="pdf" id="dropZone"><span class="upload-symbol">↑</span><strong>Choose PDF file</strong><span class="drop-sub">or click here to browse your device</span><small>PDF format · Maximum 15 MB</small><input id="pdf" type="file" accept="application/pdf,.pdf"></label>
+          <div class="file-state" id="fileState"><span class="file-dot"></span><span id="fileName">No document selected</span></div>
+          <div class="field-grid">
+            <label>Print type<select id="printType"><option value="bw">Black &amp; White</option><option value="color">Colour</option></select></label>
+            <label>Number of copies<input id="copies" type="number" min="1" max="20" value="1" inputmode="numeric"></label>
+          </div>
+          <div class="notice"><span>ⓘ</span><p>Price is calculated using your total pages, including copies. The same rate list applies to both print types.</p></div>
+        </div>
+        <aside class="summary-card">
+          <span class="summary-label">YOUR ESTIMATE</span><h3>Print summary</h3>
+          <div class="summary-row"><span>PDF pages</span><strong id="pdfPages">—</strong></div>
+          <div class="summary-row"><span>Copies</span><strong id="copyCount">1</strong></div>
+          <div class="summary-row"><span>Total print pages</span><strong id="pageCount">—</strong></div>
+          <div class="summary-total"><span>Estimated amount</span><strong id="total">₹0.00</strong></div>
+          <button id="payBtn" disabled>Payment gateway coming soon <span>→</span></button>
+          <p class="coming-note">Online payment and print confirmation will be enabled in the next setup stage.</p>
+          <div class="secure-line"><span>✓</span> Payment will be added securely in the next phase</div>
+        </aside>
+      </div>
+      <p id="message" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="rates-section">
+      <div class="section-heading"><div><span class="eyebrow">SIMPLE &amp; TRANSPARENT</span><h2>Our rate list</h2></div><span class="rate-note">Progressive slab-wise pricing</span></div>
+      <div class="rates-grid">
+        <div class="rate-item"><span class="rate-pages">01</span><div><strong>1 Page</strong><small>First page</small></div><b>₹5<span>/page</span></b></div>
+        <div class="rate-item"><span class="rate-pages">02–05</span><div><strong>2–5 Pages</strong><small>Pages in this range</small></div><b>₹3<span>/page</span></b></div>
+        <div class="rate-item"><span class="rate-pages">06–10</span><div><strong>6–10 Pages</strong><small>Pages in this range</small></div><b>₹2<span>/page</span></b></div>
+        <div class="rate-item"><span class="rate-pages">11+</span><div><strong>Above 10 Pages</strong><small>Every page after 10</small></div><b>₹1.50<span>/page</span></b></div>
+      </div>
+      <p class="rate-footnote">Rates are applied progressively: each page is charged according to the slab it falls into.</p>
+    </section>
+
+    <section class="how-section"><div class="section-heading"><div><span class="eyebrow">MADE SIMPLE</span><h2>How it works</h2></div></div><div class="steps"><div><span>01</span><b>Upload PDF</b><small>Select your document</small></div><div><span>02</span><b>Choose settings</b><small>Print type and copies</small></div><div><span>03</span><b>Check estimate</b><small>See your total price</small></div><div><span>04</span><b>Payment &amp; print</b><small>Coming in next phase</small></div></div></section>
+  </main>
+  <footer><div class="footer-main"><img src="/logo.png" alt="ETAWAH CAFE logo"><div><strong>ETAWAH <b>CAFE</b></strong><p>Self Print Kiosk · Print smart. Save time.</p></div><div class="footer-owner"><small>OWNER</small><strong>Kapil Kumar</strong></div></div><div class="footer-bottom"><span>Infront of Shiv Mandir, Idgah, Etawah</span><a href="tel:9997881913">9997881913</a><span>© <span id="year"></span> ETAWAH CAFE</span></div></footer>
+  <script src="/app.js"></script>
+</body>
+</html>
