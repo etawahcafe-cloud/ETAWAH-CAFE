@@ -440,6 +440,34 @@ app.get("/api/job/:fileId/status", (req, res) => {
   });
 });
 
+/*
+ * Protected print queue endpoint
+ * Returns only the next verified, unclaimed job.
+ */
+app.get("/api/print/next", checkAgent, (_req, res) => {
+  const nextJob = Array.from(jobs.values())
+    .filter(job =>
+      job.status === "paid" &&
+      job.claimed === false
+    )
+    .sort((a, b) => a.createdAt - b.createdAt)[0];
+
+  if (!nextJob) {
+    return res.json({
+      available: false
+    });
+  }
+
+  res.json({
+    available: true,
+    fileId: nextJob.fileId,
+    pages: nextJob.pages,
+    copies: nextJob.copies,
+    printType: nextJob.printType,
+    totalPages: nextJob.totalPages
+  });
+});
+
 // Print Agent authentication
 function checkAgent(req, res, next) {
   const token = req.get("x-print-agent-token");
